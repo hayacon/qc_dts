@@ -42,8 +42,8 @@ class QRNG():
         
      
 
-
-q = QRNG(10)
-q.circuit_rng()
-q.benchmark()
+# Example usage
+# q = QRNG(10)
+# q.circuit_rng()
+# q.benchmark()
     
