@@ -222,6 +222,17 @@ class Bell_measurement:
     # A "run" method to process *all* pairs in state_1, state_2
     # and store results in self.results
     # =============================
+    def noisy_detection(self, outcome, error_prob=0.05):
+        """
+        With probability error_prob, replace the 'outcome' with a random valid outcome.
+        'outcome' is something like "D1H+D2V".
+        """
+        if np.random.rand() < error_prob:
+            possible_outcomes = ["D1H+D1V", "D2H+D2V", "D1H+D2V", "D1V+D2H", "no_detect"]
+            return np.random.choice(possible_outcomes)
+        else:
+            return outcome
+
     def run_measurements(self):
         """
         Loop over all pairs (state_1[i], state_2[i]) and
@@ -234,6 +245,9 @@ class Bell_measurement:
             
             # sample a single detection event from prob_dist
             outcome = self.sample_detection_outcome(prob_dist)
+            # inject some noise---------------
+            outcome = self.noisy_detection(outcome, error_prob=0.05)
+            #---------------------------------
             label = self.interpret_bsm_outcome(outcome)
 
             record = {
