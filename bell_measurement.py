@@ -244,6 +244,7 @@ class Bell_measurement:
                 "interpretation": label
             }
             self.results.append(record)
+        return self.results
 
     # =============================
     # Helper: print the results
@@ -263,6 +264,13 @@ class Bell_measurement:
             print(f"  (Sum of probabilities) = {sum_p:.3f}")
             print(f"  Sampled outcome: {rec['sample_outcome']}")
             print(f"  Interpreted as: {rec['interpretation']}")
+
+    #function to return the interpretation of the results
+    def get_interpretation(self):
+        interpretation = []
+        for i,rec in enumerate(self.results):
+            interpretation.append(rec['interpretation'])
+        return interpretation
 
 
 # =========================================================

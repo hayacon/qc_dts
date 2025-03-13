@@ -38,6 +38,6 @@ class User():
                 else:
                     self.states.append('A')
         
-        return self.states
+        return self.states, states_bit
 
       
