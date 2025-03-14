@@ -1,35 +1,44 @@
-from user import User
+from user import User, Eve
 from bell_measurement import Bell_measurement
 from post_processing import AlicePostProcessing, BobPostProcessing
 
 import numpy as np
 
-user_1 = User(100)
-user_2 = User(100)
+alice = User(100)
+bob = User(100)
+eve = Eve(0.3)
 
-basis_1 = user_1.set_basis()
-basis_2 = user_2.set_basis()
+alice_basis = alice.set_basis()
+bob_basis = bob.set_basis()
 
-print('basis_1')
-print(basis_1)
+print('alice_basis')
+print(alice_basis)
 
-state_1, bits_1 = user_1.state_encoder()
-state_2, bits_2 = user_2.state_encoder()
+alice_state, alice_bits = alice.state_encoder()
+bob_state, bob_bits = bob.state_encoder()
+
+#pick who to intercept (alice or bob)
+intercepted = np.random.choice([0, 1])
+if intercepted == 0:
+    eve.intercept(bases=alice_basis, bits=alice_bits)
+else:
+    eve.intercept(bases=bob_basis, bits=bob_bits)
+
 
 #init port processing
-alice_pp = AlicePostProcessing(basis_1, bits_1)
-bob_pp = BobPostProcessing(basis_2, bits_2)
+alice_pp = AlicePostProcessing(alice_basis, alice_bits)
+bob_pp = BobPostProcessing(bob_basis, bob_bits)
 
 
-bsm = Bell_measurement(state_1, state_2)
+bsm = Bell_measurement(alice_state, bob_state)
 result = bsm.run_measurements()
 # bsm.print_results()
 result = bsm.get_interpretation()
 print(result)
 
 # post processing
-nA = alice_pp.sifting(basis_2, result)
-nB = bob_pp.sifting(basis_1, result)
+nA = alice_pp.sifting(bob_basis, result)
+nB = bob_pp.sifting(alice_basis, result)
 
 print(f"Sifted length => Alice: {nA}, Bob: {nB}")
 print("Alice's sifted key:", alice_pp.sifted_key)

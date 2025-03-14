@@ -56,4 +56,51 @@ class User():
         
         return self.states, states_bit
 
-      
+
+class Eve:
+    """
+    Model Eve intercepting only Alice's qubits in an MDI-QKD setup.
+    She chooses a random basis (Z or X) and, if it differs from Alice's, 
+    flips the bit with a 50% chance.
+    
+    This simulates measurement disturbance on one side only.
+    """
+    def __init__(self, p_alice=0.3):
+        """
+        p_alice: Probability that Eve intercepts a given qubit from Alice.
+        """
+        self.p_alice = p_alice
+
+    def intercept(
+        self, 
+        bases, 
+        bits
+    ):
+        """
+        With probability p_alice, Eve intercepts Alice’s qubit 
+        and measures in a random basis (Z or X).
+        If Eve's basis != Alice's basis, there's a 50% chance 
+        that the bit is flipped.
+        
+        :param bases: list of 'Z'/'X' for each round (Alice's chosen basis).
+        :param bits:  list of bits (0/1) for each round (Alice's measurement outcomes).
+                            This list is modified in place.
+        """
+        n = len(bases)
+        if len(bits) != n:
+            raise ValueError("Mismatch in length: bases vs. bits")
+
+        intercepted_count = 0
+        for i in range(n):
+            if np.random.rand() < self.p_alice:
+                intercepted_count += 1
+                eve_basis = np.random.choice(['Z','X'])
+                # If Eve's basis != Alice's basis, 50% chance to flip
+                if eve_basis != bases[i]:
+                    if np.random.rand() < 0.5:
+                        bit_int = int(bits[i])
+                        bit_int ^= 1
+                        bits[i] = bit_int
+        
+        return intercepted_count
+
