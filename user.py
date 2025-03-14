@@ -1,5 +1,5 @@
 from qrng import QRNG
-
+import numpy as np
 
 class User():
 
