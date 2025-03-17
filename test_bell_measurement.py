@@ -1,6 +1,6 @@
 import pytest
-import numpy as np
 from bell_measurement import Bell_measurement
+import numpy as np
 
 
 def test_init_length_mismatch():

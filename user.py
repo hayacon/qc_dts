@@ -6,7 +6,7 @@ class User():
     def __init__(self, bit_len):
         self.bit_len = bit_len
         self.basis = None
-        self.states = list()
+        self.states = []
 
     def set_basis(self):
         qrng = QRNG(self.bit_len)

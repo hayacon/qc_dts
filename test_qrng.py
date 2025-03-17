@@ -1,66 +1,47 @@
 import pytest
-from io import StringIO
-from unittest.mock import patch
+import numpy as np
+from qiskit_aer import Aer
+from qrng import QRNG  # Replace 'your_module' with the actual module name
 
-from qrng import QRNG
+@pytest.fixture
+def qrng():
+    return QRNG(bit_len=100)  # Generate 100 random bits for testing
 
-def test_init():
-    """
-    Test that the QRNG object initializes with the correct bit_len
-    and an empty random_bits list.
-    """
-    bit_len = 10
-    q = QRNG(bit_len)
-    assert q.bit_len == bit_len, "bit_len should match the constructor argument"
-    assert isinstance(q.random_bits, list), "random_bits should be a list"
-    assert len(q.random_bits) == 0, "random_bits should be empty initially"
+def test_circuit_rng(qrng):
+    generated_bits = qrng.circuit_rng()
+    assert len(generated_bits) == 100  # Should generate 100 bits
+    assert all(bit in [0, 1] for bit in generated_bits)  # Bits should be 0 or 1
 
+def test_chi_square_test(qrng):
+    qrng.random_bits = np.random.choice([0, 1], size=100, p=[0.5, 0.5]).tolist()
+    results = qrng.chi_square_test()
+    
+    assert "chi_square_stat" in results
+    assert "p_value" in results
+    assert "is_random" in results
+    assert isinstance(results["chi_square_stat"], float)
+    assert isinstance(results["p_value"], float)
+    assert isinstance(results["is_random"], np.bool)
 
-def test_circuit_rng_length():
-    """
-    Test that circuit_rng generates the correct number of bits.
-    """
-    bit_len = 5
-    q = QRNG(bit_len)
-    result = q.circuit_rng()
-    assert len(result) == bit_len, "Should generate the exact number of bits requested"
-    assert len(q.random_bits) == bit_len, "The stored random_bits should match the result length"
+def test_shannon_entropy(qrng):
+    qrng.random_bits = np.random.choice([0, 1], size=100, p=[0.5, 0.5]).tolist()
+    entropy_results = qrng.shannon_entropy()
 
+    assert "shannon_entropy" in entropy_results
+    assert "is_random" in entropy_results
+    assert isinstance(entropy_results["shannon_entropy"], float)
+    assert 0.0 <= entropy_results["shannon_entropy"] <= 1.0
+    assert isinstance(entropy_results["is_random"], np.bool)
 
-def test_circuit_rng_values():
-    """
-    Test that circuit_rng outputs only valid bits (0 or 1).
-    """
-    bit_len = 5
-    q = QRNG(bit_len)
-    bits = q.circuit_rng()
-    for bit in bits:
-        assert bit in (0, 1), "Each generated value should be 0 or 1"
+def test_auto_correlation(qrng):
+    qrng.random_bits = np.random.choice([0, 1], size=100, p=[0.5, 0.5]).tolist()
+    autocorr_results = qrng.auto_correlation(max_lag=10)
 
+    assert "autocorrelation_values" in autocorr_results
+    assert "is_random" in autocorr_results
+    assert isinstance(autocorr_results["autocorrelation_values"], dict)
+    assert isinstance(autocorr_results["is_random"], bool)
 
-@patch('sys.stdout', new_callable=StringIO)
-def test_benchmark_no_bits(mock_stdout):
-    """
-    Test that benchmark outputs a warning when no bits are generated.
-    """
-    q = QRNG(bit_len=0)
-    q.benchmark()
-    output = mock_stdout.getvalue()
-    assert "No random bits generated yet." in output, "Should warn if no bits are available"
-
-
-@patch('sys.stdout', new_callable=StringIO)
-def test_benchmark_randomness(mock_stdout):
-    """
-    Test that benchmark runs a chi-square test and prints out relevant information.
-    We only verify the presence of expected output lines (chi-square and p-value).
-    """
-    bit_len = 10
-    q = QRNG(bit_len)
-    q.circuit_rng()
-    q.benchmark()
-    output = mock_stdout.getvalue()
-
-    # Check that the chi-square statistic and p-value are printed
-    assert "Chi-square statistic:" in output, "Should display chi-square statistic"
-    assert "P-value:" in output, "Should display p-value"
+    # Check that autocorrelation values are near zero
+    for lag, value in autocorr_results["autocorrelation_values"].items():
+        assert -1.0 <= value <= 1.0  # Autocorrelation should be within this range

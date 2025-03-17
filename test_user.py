@@ -30,7 +30,8 @@ def test_state_encoder():
     '''
     user = User(bit_len=10)
     basis = user.set_basis()
-    states = user.state_encoder()
+    states, _ = user.state_encoder()
+    # print(states)
     assert isinstance(states, list), "states should be a list"
     assert len(states) == 10, "states should have the same length as bit_len"
     assert states[0] in ['V', 'H', 'D', 'A'], "states should be either '0' or '1'"
