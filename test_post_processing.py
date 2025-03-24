@@ -1,5 +1,5 @@
 import pytest
-from post_postcessing import AlicePostProcessing, BobPostProcessing  # Replace 'your_module' with actual module name
+from post_processing import AlicePostProcessing, BobPostProcessing  # Replace 'your_module' with actual module name
 
 @pytest.fixture
 def alice():
