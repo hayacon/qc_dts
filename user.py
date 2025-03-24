@@ -9,8 +9,8 @@ class User():
         self.states = []
 
     def set_basis(self):
-        qrng = QRNG(self.bit_len)
-        bssis_bits = qrng.circuit_rng()
+        qrng = QRNG(self.bit_len, options='qrng')
+        bssis_bits = qrng.generate_random_bits()
         self.basis = ['Z' if bit == 0 else 'X' for bit in bssis_bits]
         return self.basis
 
@@ -22,7 +22,8 @@ class User():
         """
         if np.random.rand() < flip_prob:
             # Randomly pick one from the four standard polarizations
-            return np.random.choice(["H", "V", "D", "A"])
+            new_state = np.random.choice(["H", "V", "D", "A"])
+            return str(new_state)
         else:
             return state
 
@@ -65,7 +66,7 @@ class Eve:
     
     This simulates measurement disturbance on one side only.
     """
-    def __init__(self, p_alice=0.3):
+    def __init__(self, p_alice=0.1):
         """
         p_alice: Probability that Eve intercepts a given qubit from Alice.
         """

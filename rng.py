@@ -2,11 +2,17 @@ from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer
 from scipy.stats import chisquare, entropy
 import numpy as np
+import os
+import secrets
+import random
+from Crypto.Random import get_random_bytes
 
-class QRNG:
-    def __init__(self, bit_len):
+
+class RNG:
+    def __init__(self, bit_len, options):
         self.bit_len = bit_len
         self.random_bits = []
+        self.options = options
         
     def circuit_rng(self):
         # Clear any previously stored bits
@@ -35,7 +41,66 @@ class QRNG:
             measured_bit = int(measured_bit_str)
             self.random_bits.append(measured_bit)
         
-        print("Generated bits:", self.random_bits)
+        # print("Generated bits:", self.random_bits)
+        return self.random_bits
+
+    def os_get_random_bits(self):
+        num_bytes = (self.bit_len + 7) // 8  # Calculate the number of bytes needed
+        random_bytes = os.urandom(num_bytes)
+        random_bits = []
+
+        for byte in random_bytes:
+            for i in range(8):
+                if len(random_bits) < self.bit_len:
+                    random_bits.append((byte >> i) & 1)
+
+        return random_bits
+
+    # PyCryptoDome's get_random_bytes() function
+    def generate_secure_random_bits(self):
+        num_bytes = (self.bit_len + 7) // 8  # Calculate the number of bytes needed
+        random_bytes = get_random_bytes(num_bytes)
+        random_bits = []
+
+        for byte in random_bytes:
+            for i in range(8):
+                if len(random_bits) < self.bit_len:
+                    random_bits.append((byte >> i) & 1)
+
+        return random_bits # Truncate to the desired length
+
+    def generate_random_bits(self):
+        """
+        Generates random bits using a quantum circuit and stores them in the `random_bits` attribute.
+
+        Parameters:
+        ----------
+        None
+
+        Returns:
+        -------
+        list
+            A list of generated random bits (0s and 1s).
+        """
+        if self.options == 'qrng':
+            self.random_bits = self.circuit_rng()
+        elif self.options == 'numpy':
+            # rng = np.random.default_rng()
+            # random_bits = rng.integers(0, 2, size=self.bit_len)
+            self.random_bits = np.random.randint(0, 2, self.bit_len).tolist()
+        elif self.options == 'os':
+            self.random_bits = self.os_get_random_bits()
+        elif self.options == 'secrets':
+            rn = secrets.randbits(self.bit_len)
+            self.random_bits = [(rn >> i) & 1 for i in range(self.bit_len)]
+        elif self.options == 'random':
+            rn = random.getrandbits(self.bit_len)
+            self.random_bits = [(rn >> i) & 1 for i in range(self.bit_len)]
+        elif self.options == 'crypto':
+            self.random_bits = self.generate_secure_random_bits()
+        else:
+            print("Invalid option. Please select one of 'qrng', 'numpy', 'os', 'secrets', or 'random'.") 
+
         return self.random_bits
     
     def chi_square_test(self):

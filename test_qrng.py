@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from qiskit_aer import Aer
-from qrng import QRNG  # Replace 'your_module' with the actual module name
+from rng import RNG  # Replace 'your_module' with the actual module name
 
 @pytest.fixture
 def qrng():
