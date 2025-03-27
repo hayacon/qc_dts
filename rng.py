@@ -465,22 +465,61 @@ class RNG:
 
     def non_overlapping_template_matching(self):
         """
-        Performs the Non-overlapping Template Matching test to detect non-randomness in the sequence of random bits.
+        Performs the Non-overlapping Template Matching test according to NIST SP 800-22.
+        This requires bit lentgh to be more than 51,200 bits to be reliable.
+        Returns:
+            dict: Contains the P-value and a boolean indicating if the sequence is random (P-value >= 0.01).
+                  If the sequence is too short, returns a message and 'idk' for is_random.
         """
-        threshold = 0.01  # NIST significance level
-        template = [1] * 9
-        template_len = len(template)
-        matches = 0
-        i = 0
-        while i <= self.bit_len - template_len:
-            if self.random_bits[i:i+template_len] == template:
-                matches += 1
-                i += template_len  # Skip to position after the match
-            else:
-                i += 1  # Slide window by 1        expected = (self.bit_len - template_len + 1) * (0.5 ** template_len)
-        expected = self.bit_len / (template_len * 512)  # Approximate for non-overlapping
-        p_value = 1 - stats.poisson.cdf(matches - 1, expected)
-        return {"p_value": p_value, "is_random": p_value >= threshold}
+        # Determine template length and set block size M
+        template = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+        m = 9
+        M = 1024
+        
+        # Check if the sequence is long enough for at least one block
+        if self.bit_len < M:
+            return {
+                "p_value": f"Test was skipped because of insufficient input, Sequence length {self.bit_len} is less than required {M} bits",
+                "is_random": 'idk'
+            }
+        
+        # Calculate number of blocks N
+        N = self.bit_len // M
+        
+        # Divide the sequence into N blocks
+        blocks = [self.random_bits[i * M : (i + 1) * M] for i in range(N)]
+        
+        # Count non-overlapping template matches in each block
+        W = []
+        for block in blocks:
+            count = 0
+            i = 0
+            while i <= len(block) - m:
+                if block[i:i + m] == template:
+                    count += 1
+                    i += m  # Skip m bits after a match (non-overlapping)
+                else:
+                    i += 1
+            W.append(count)
+        
+        # Compute theoretical mean and variance
+        mu = (M - m + 1) / (2 ** m)
+        sigma2 = M * (2 ** (-m) - 2 ** (-2 * m))
+        
+        # Calculate chi-square statistic
+        chi2 = sum((w - mu) ** 2 / sigma2 for w in W)
+        
+        # Compute P-value using chi-square survival function
+        p_value = stats.chi2.sf(chi2, df=N)
+        
+        # Determine randomness (P-value threshold of 0.01)
+        is_random = p_value >= 0.01
+        
+        # If N < 100, add a warning to the p_value
+        if N < 100:
+            p_value = f"Warning: Only {N} blocks used (less than 100). P-value may not be reliable. P-value: {p_value:.6f}"
+        
+        return {"p_value": p_value, "is_random": is_random}
 
     def overlapping_template_matching(self):
         threshold = 0.01  # NIST significance level

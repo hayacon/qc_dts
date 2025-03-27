@@ -1,5 +1,6 @@
 import numpy as np
 import hashlib
+import math
 
 #######################################################
 # Alice's Side
@@ -23,7 +24,7 @@ class AlicePostProcessing:
                 continue
             if self.alice_bases[i] == bob_bases[i]:
                 self.sifted_key.append(self.alice_bits[i])
-        return len(self.sifted_key)
+        return self.sifted_key, len(self.sifted_key)
 
     def reveal_subset_bits(self, indices):
         """
@@ -61,42 +62,41 @@ class AlicePostProcessing:
             if i not in idx_set:
                 new_key.append(bit)
         self.sifted_key = new_key
+        return self.sifted_key
 
-    def privacy_amplification(self, final_length=16, salt=b"shared-seed"):
-        """
-        Simple hash-based Privacy Amplification.
-        
-        Steps:
-          1) Convert sifted_key to a string.
-          2) Append a 'salt' or shared seed (agreed upon publicly).
-          3) Compute SHA-256 of that string.
-          4) Convert hash hex -> binary and keep 'final_length' bits.
-        
-        If your bits match Bob's exactly, you'll produce the same final key hash.
-        If there's any mismatch, you'll end up with different hashes.
-        
-        :param final_length: how many bits to keep from the final hashed output.
-        :param salt: additional bytes used to randomize the hash (shared publicly).
-        :return: list[int], the final privacy-amplified key bits.
-        """
-        if len(self.sifted_key) == 0:
+    def binary_entropy(self, p):
+        """Compute binary entropy of p."""
+        if p <= 0 or p >= 1:
+            return 0
+        return -p * math.log2(p) - (1 - p) * math.log2(1 - p)
+
+    def privacy_amplification(self, qber, salt=b"shared-seed", epsilon=0.001):
+        """Perform simplified privacy amplification."""
+        n = len(self.sifted_key)
+        if n == 0:
             return []
 
-        # 1) Convert bits -> string
+        # Compute binary entropy and leakage
+        h_Q = self.binary_entropy(qber)  
+        leak_EC = 1.2 * n * h_Q  # Information leaked during error correction
+        security_margin = 2 * math.log2(1 / epsilon)  # Security buffer
+
+        # Calculate final key length
+        final_length = max(0, int(n - leak_EC - security_margin))
+
+        # Convert sifted key to string
         key_str = "".join(str(bit) for bit in self.sifted_key)
-        # 2) Append salt
         combined_str = key_str + salt.decode('utf-8', errors='ignore')
 
-        # 3) Compute SHA-256
-        h = hashlib.sha256(combined_str.encode()).hexdigest()  # hex string
-        # 4) Convert hex -> binary
-        hash_bin = bin(int(h, 16))[2:].zfill(256)  # 256 bits
-        # Keep only final_length bits
+        # Hash with SHA-256
+        h = hashlib.sha256(combined_str.encode()).hexdigest()
+        hash_bin = bin(int(h, 16))[2:].zfill(256)  # Convert to binary string
+
+        # Take first final_length bits
         final_bits_str = hash_bin[:final_length]
         final_bits = [int(b) for b in final_bits_str]
 
         return final_bits
-
 
 #######################################################
 # Bob's Side
@@ -105,6 +105,7 @@ class BobPostProcessing:
     def __init__(self, bob_bases, bob_bits):
         self.bob_bases = bob_bases
         self.bob_bits  = bob_bits
+        self.qber_estimate = 0.0
         self.sifted_key = []
 
     def sifting(self, alice_bases, relay_outcomes):
@@ -129,7 +130,7 @@ class BobPostProcessing:
                         self.bob_bits[i] = 1 - self.bob_bits[i]
 
                 self.sifted_key.append(self.bob_bits[i])
-        return len(self.sifted_key)
+        return self.sifted_key, len(self.sifted_key)
 
     def estimate_qber_sample(self, alice_revealed):
         """
@@ -148,9 +149,9 @@ class BobPostProcessing:
                 if self.sifted_key[idx] != a_bit:
                     n_mismatch += 1
 
-        qber_estimate = n_mismatch / len(alice_revealed)
+        self.qber_estimate = n_mismatch / len(alice_revealed)
         indices = sorted(alice_revealed.keys())
-        return qber_estimate, indices
+        return self.qber_estimate, indices
 
     def remove_indices(self, indices_to_remove):
         """
@@ -163,6 +164,7 @@ class BobPostProcessing:
             if i not in idx_set:
                 new_key.append(bit)
         self.sifted_key = new_key
+        return self.sifted_key
 
     ##############################################################################
     # CASCADE-like multi-pass error correction
@@ -221,6 +223,7 @@ class BobPostProcessing:
             for i in range(n):
                 new_key[i] = perm_key[inverse_perm[i]]
             self.sifted_key = new_key
+        return self.sifted_key
 
     def binary_search_flip(self, alice_obj, perm_key, block_indices, perm):
         """
@@ -276,35 +279,40 @@ class BobPostProcessing:
             self.cascade_pass(alice_obj, block_size=bsize, perm=perm)
         # Additional passes can be done if QBER is still high.
 
-    def privacy_amplification(self, final_length=16, salt=b"shared-seed"):
-        """
-        Simple hash-based Privacy Amplification.
-        
-        Steps:
-            1) Convert sifted_key to a string.
-            2) Append a 'salt' or shared seed (agreed upon publicly).
-            3) Compute SHA-256 of that string.
-            4) Convert hash hex -> binary and keep 'final_length' bits.
-        
-        If your bits match Alice's exactly, you'll produce the same final key hash.
-        If there's any mismatch, you'll end up with different hashes.
-        
-        :param final_length: how many bits to keep from the final hashed output.
-        :param salt: additional bytes used to randomize the hash (shared publicly).
-        :return: list[int], the final privacy-amplified key bits.
-        """
-        if len(self.sifted_key) == 0:
+    def binary_entropy(self, p):
+        """Compute binary entropy of p."""
+        if p <= 0 or p >= 1:
+            return 0
+        return -p * math.log2(p) - (1 - p) * math.log2(1 - p)
+
+    def privacy_amplification(self, salt=b"shared-seed", epsilon=0.001):
+        """Perform simplified privacy amplification."""
+        n = len(self.sifted_key)
+        if n == 0:
             return []
 
+        # Compute binary entropy and leakage
+        h_Q = self.binary_entropy(self.qber_estimate)  
+        leak_EC = 1.2 * n * h_Q  # Information leaked during error correction
+        security_margin = 2 * math.log2(1 / epsilon)  # Security buffer
+
+        # Calculate final key length
+        final_length = max(0, int(n - leak_EC - security_margin))
+
+        # Convert sifted key to string
         key_str = "".join(str(bit) for bit in self.sifted_key)
         combined_str = key_str + salt.decode('utf-8', errors='ignore')
 
+        # Hash with SHA-256
         h = hashlib.sha256(combined_str.encode()).hexdigest()
-        hash_bin = bin(int(h, 16))[2:].zfill(256)
+        hash_bin = bin(int(h, 16))[2:].zfill(256)  # Convert to binary string
+
+        # Take first final_length bits
         final_bits_str = hash_bin[:final_length]
         final_bits = [int(b) for b in final_bits_str]
 
         return final_bits
+
 
     def measure_qber_direct(self, alice_key):
         """

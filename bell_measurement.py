@@ -1,7 +1,7 @@
 import numpy as np
 
 class Bell_measurement:
-    def __init__(self, state_1, state_2):
+    def __init__(self, state_1, state_2, noise=0):
         """
         state_1: list (or tuple) of polarization strings for Alice, e.g. ["H","V","D",...]
         state_2: list of polarization strings for Bob, e.g. ["H","D","V",...]
@@ -10,6 +10,7 @@ class Bell_measurement:
         """
         self.state_1 = state_1
         self.state_2 = state_2
+        self.noise = noise
 
         # Check that both lists have the same length:
         assert len(self.state_1) == len(self.state_2), \
@@ -222,7 +223,7 @@ class Bell_measurement:
     # A "run" method to process *all* pairs in state_1, state_2
     # and store results in self.results
     # =============================
-    def noisy_detection(self, outcome, error_prob=0.05):
+    def noisy_detection(self, outcome, error_prob=0):
         """
         With probability error_prob, replace the 'outcome' with a random valid outcome.
         'outcome' is something like "D1H+D2V".
@@ -246,7 +247,7 @@ class Bell_measurement:
             # sample a single detection event from prob_dist
             outcome = self.sample_detection_outcome(prob_dist)
             # inject some noise---------------
-            outcome = self.noisy_detection(outcome, error_prob=0.05)
+            outcome = self.noisy_detection(outcome, error_prob=self.noise)
             #---------------------------------
             label = self.interpret_bsm_outcome(outcome)
 

@@ -1,20 +1,21 @@
-from qrng import QRNG
+from rng import RNG
 import numpy as np
 
 class User():
 
-    def __init__(self, bit_len):
+    def __init__(self, bit_len, noise=0):
         self.bit_len = bit_len
         self.basis = None
         self.states = []
+        self.noise = 0
 
     def set_basis(self):
-        qrng = QRNG(self.bit_len, options='qrng')
+        qrng = RNG(self.bit_len, options='qrng')
         bssis_bits = qrng.generate_random_bits()
         self.basis = ['Z' if bit == 0 else 'X' for bit in bssis_bits]
         return self.basis
 
-    def noisy_polarization(self, state, flip_prob=0.05):
+    def noisy_polarization(self, state, flip_prob=0):
         """
         With probability flip_prob, replace pol with a random polarization 
         from the set {H, V, D, A}.
@@ -37,7 +38,7 @@ class User():
         |D> = 1/sqrt(2)(|V> + |H>) = [1, 1] diagonal polarization state
         |A> = 1/sqrt(2)(|V>-|H>) = [1, -1] anti-diagonal polarization state
         '''
-        qrng = QRNG(self.bit_len)
+        qrng = RNG(self.bit_len, options='qrng')
         states_bit = qrng.circuit_rng()
         for i in range(len(self.basis)):
             if self.basis[i] == 'Z':

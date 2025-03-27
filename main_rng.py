@@ -84,7 +84,7 @@ def test_result(chi,
 
 
 # bit_len = 2000
-bit_len = 100000
+bit_len = 1000
 
 qrng = RNG(bit_len=bit_len, options='qrng')
 print('Quantum random number generator')
