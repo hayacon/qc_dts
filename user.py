@@ -10,7 +10,7 @@ class User():
         self.noise = 0
 
     def set_basis(self):
-        qrng = RNG(self.bit_len, options='qrng')
+        qrng = RNG(self.bit_len, options='numpy')
         bssis_bits = qrng.generate_random_bits()
         self.basis = ['Z' if bit == 0 else 'X' for bit in bssis_bits]
         return self.basis

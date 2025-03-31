@@ -5,6 +5,7 @@ import math
 #######################################################
 # Alice's Side
 #######################################################
+# time complexity: O(6n) 
 class AlicePostProcessing:
     def __init__(self, alice_bases, alice_bits):
         self.alice_bases = alice_bases
@@ -101,6 +102,7 @@ class AlicePostProcessing:
 #######################################################
 # Bob's Side
 #######################################################
+# time complexity: O(n log m) where m is size of receal bits by Alice
 class BobPostProcessing:
     def __init__(self, bob_bases, bob_bits):
         self.bob_bases = bob_bases

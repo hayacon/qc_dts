@@ -7,6 +7,7 @@ import time
 import os
 import csv
 from tqdm import tqdm
+import time
 
 def write_test_result(file_name: str,result_dict: dict):
     file_exists = os.path.isfile(file_name)
@@ -25,6 +26,7 @@ def main(initial_bit_length = 1000, eve_ratio = 0.0, sample_ratio = 0.2, channel
     bob = User(initial_bit_length, noise=channel_noise)
     eve = Eve(eve_ratio) 
 
+    q_start = time.time()
     alice_basis = alice.set_basis()
     bob_basis = bob.set_basis()
 
@@ -53,10 +55,7 @@ def main(initial_bit_length = 1000, eve_ratio = 0.0, sample_ratio = 0.2, channel
     # print(f"Eve intercepted {intercept_count} bits")
     # print("============================================")
 
-    #init port processing
-    start = time.time()
-    alice_pp = AlicePostProcessing(alice_basis, alice_bits)
-    bob_pp = BobPostProcessing(bob_basis, bob_bits)
+
 
 
     bsm = Bell_measurement(alice_state, bob_state, noise = detection_noise)
@@ -65,6 +64,9 @@ def main(initial_bit_length = 1000, eve_ratio = 0.0, sample_ratio = 0.2, channel
     result = bsm.get_interpretation()
     # print("Bell measurement results:")
     # print(result)
+    q_end = time.time()
+    q_time = q_end - q_start
+    # print(f"Quantum mock execution time: {q_time} seconds")
     bm_success_count = 0
     for i in result:
         if i != 'no_BSM':
@@ -73,7 +75,10 @@ def main(initial_bit_length = 1000, eve_ratio = 0.0, sample_ratio = 0.2, channel
             continue
 
     # print(f"Number of success measurement: {success_count}")
-
+    #init port processing
+    start = time.time()
+    alice_pp = AlicePostProcessing(alice_basis, alice_bits)
+    bob_pp = BobPostProcessing(bob_basis, bob_bits)
     # post processing
     alice_sifted_key, nA= alice_pp.sifting(bob_basis, result)
     bob_sifted_key, nB = bob_pp.sifting(alice_basis, result)
@@ -113,14 +118,14 @@ def main(initial_bit_length = 1000, eve_ratio = 0.0, sample_ratio = 0.2, channel
     # print("============================================")
     # 6) Final keys
     alice_final = alice_pp.privacy_amplification(salt=b"mysharedseed", qber=qber_est)
-    bob_final   = bob_pp.privacy_amplification(salt=b"mysharedseed")
-    end = time.time()
-    execution_time = end - start
-
+    bob_final = bob_pp.privacy_amplification(salt=b"mysharedseed")
+    end = time.time() 
+    execution_time = end - start # time in seconds
+    # print(f"Execution time: {execution_time} seconds")
     if len(alice_final) == 0 or len(bob_final) == 0:
         # print("Not enough security to produce secure key")
         # print(f"Execution Time: {execution_time} seconds")
-        return 0, 0, 0, 0
+        return 0, 0, 0, 0, 0
     else:
         # print(f"\nPrivacy-Amplified Keys: {len(alice_final)} bits")
         # print("Alice final hashed bits:", alice_final)
@@ -132,74 +137,309 @@ def main(initial_bit_length = 1000, eve_ratio = 0.0, sample_ratio = 0.2, channel
         # print(f"\nMatching bits: {match_count} / {len(alice_final)} => {match_percent:.2f}%")
         # print(f"Execution Time: {execution_time} seconds")
         final_key_length = len(alice_final)
-        return match_percent, final_key_length, qber_est, bm_success_count
+        return match_percent, final_key_length, qber_est, bm_success_count, execution_time
 
 
-eve_ratio_list = [0, 0.1, 0.2, 0.3]
-sample_ratio_list = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4]
+eve_ratio_list = [0, 0.1, 0.2]
+sample_ratio_list = [0.1, 0.15, 0.2, 0.25,]
 channel_noise_list = [0, 0.05, 0.1, 0.2, 0.3]
 detection_noise_list = [0, 0.05, 0.1, 0.2, 0.3]
+eve = 0
+sample = 0.1
+channel = 0
+detection = 0
 
+# for sample in tqdm(sample_ratio_list, desc="Sample ratio"):
+#     test_type = "Sample ratio"
+#     scount = 0
+#     fcount = 0
+#     key_length_list = []
+#     qber_list = []
+#     execution_time_list = []
+#     initial_bit_length = 1000
+#     for i in tqdm(range(10)):
+#         result, final_key_length, qber, bm_success_count, execution_time = main(initial_bit_length = initial_bit_length, eve_ratio=eve, sample_ratio=sample, channel_noise=channel, detection_noise=detection)
+#         key_length_list.append(final_key_length)
+#         qber_list.append(qber)
+#         execution_time_list.append(execution_time)
+#         if result == 100:
+#             scount += 1
+#             outcome = 'Success'
+#         elif result == 0:
+#             fcount += 1
+#             outcome = 'Not enough security, fail'
+#         else:
+#             fcount += 1
+#             outcome = 'Fail'
+
+#         result_dict = {
+#             "test type": test_type,
+#             "initial bit length": initial_bit_length,
+#             "eve_ratio": eve,
+#             "sample_ratio": sample,
+#             "channel_noise": channel,
+#             "detection_noise": detection,
+#             "qber": qber,
+#             "outcome": outcome,
+#             "final key length": final_key_length,
+#             "bm_success_count": bm_success_count, 
+#             "execution_time": execution_time
+#         }
+#         write_test_result("result.csv", result_dict)
+
+#     success_percentage = (scount / (scount + fcount)) * 100
+#     key_length_list = list(map(int, key_length_list))
+#     key_length_ave = sum(key_length_list) / len(key_length_list)
+#     qber_ave = sum(qber_list) / len(qber_list)
+#     key_length_std = np.std(key_length_list)
+#     qber_std = np.std(qber_list)
+#     key_length_diff = np.max(key_length_list) - np.min(key_length_list)
+#     qber_diff = np.max(qber_list) - np.min(qber_list)
+#     excution_time_ave = sum(execution_time_list) / len(execution_time_list)
+#     excution_time_std = np.std(execution_time_list)
+#     excution_time_diff = np.max(execution_time_list) - np.min(execution_time_list)
+#     overall_result = {
+#         "test type": test_type,
+#         "initial bit length": initial_bit_length,
+#         "eve_ratio": eve,
+#         "sample_ratio": sample,
+#         "channel_noise": channel,
+#         "detection_noise": detection,
+#         "success percentage": success_percentage,
+#         "final key length average": key_length_ave,
+#         "final key length std": key_length_std,
+#         "final key length diff": key_length_diff,
+#         "qber average": qber_ave,
+#         "qber std": qber_std,
+#         "qber diff": qber_diff,
+#         "execution time average": excution_time_ave,
+#         "execution time std": excution_time_std,
+#         "execution time diff": excution_time_diff
+#     }
+#     write_test_result("result_overall.csv", overall_result)
+
+
+eve = 0
+sample = 0.1
+channel = 0
+detection = 0
 
 # Test different eve ratio
 for eve in tqdm(eve_ratio_list, desc="Eve ratio"):
-    for sample in tqdm(sample_ratio_list, desc="Sample ratio"):
-        for channel in tqdm(channel_noise_list, desc="Channel noise"):
-            for detection in tqdm(detection_noise_list, desc="Detection noise"):
-                scount = 0
-                fcount = 0
-                key_length_list = []
-                qber_list = []
-                initial_bit_length = 100
-                for i in range(5):
-                    result, final_key_length, qber, bm_success_count = main(initial_bit_length = initial_bit_length, eve_ratio=eve, sample_ratio=sample, channel_noise=channel, detection_noise=detection)
-                    key_length_list.append(final_key_length)
-                    qber_list.append(qber)
-                    if result == 100:
-                        scount += 1
-                        outcome = 'Success'
-                    elif result == 0:
-                        fcount += 1
-                        outcome = 'Not enough security, fail'
-                    else:
-                        fcount += 1
-                        outcome = 'Fail'
+    test_type = "Eve ratio"
+    scount = 0
+    fcount = 0
+    key_length_list = []
+    qber_list = []
+    execution_time_list = []
+    initial_bit_length = 1000
+    for i in tqdm(range(10)):
+        result, final_key_length, qber, bm_success_count, execution_time = main(initial_bit_length = initial_bit_length, eve_ratio=eve, sample_ratio=sample, channel_noise=channel, detection_noise=detection)
+        key_length_list.append(final_key_length)
+        qber_list.append(qber)
+        execution_time_list.append(execution_time)
+        if result == 100:
+            scount += 1
+            outcome = 'Success'
+        elif result == 0:
+            fcount += 1
+            outcome = 'Not enough security, fail'
+        else:
+            fcount += 1
+            outcome = 'Fail'
 
-                    result_dict = {
-                        "initial bit length": initial_bit_length,
-                        "eve_ratio": eve,
-                        "sample_ratio": sample,
-                        "channel_noise": channel,
-                        "detection_noise": detection,
-                        "qber": qber,
-                        "outcome": outcome,
-                        "final key length": final_key_length,
-                        "bm_success_count": bm_success_count
-                    }
-                    write_test_result("result.csv", result_dict)
+        result_dict = {
+            "test type": test_type,
+            "initial bit length": initial_bit_length,
+            "eve_ratio": eve,
+            "sample_ratio": sample,
+            "channel_noise": channel,
+            "detection_noise": detection,
+            "qber": qber,
+            "outcome": outcome,
+            "final key length": final_key_length,
+            "bm_success_count": bm_success_count, 
+            "execution_time": execution_time
+        }
+        write_test_result("result.csv", result_dict)
 
-                success_percentage = (scount / (scount + fcount)) * 100
-                key_length_list = list(map(int, key_length_list))
-                key_length_ave = sum(key_length_list) / len(key_length_list)
-                qber_ave = sum(qber_list) / len(qber_list)
-                key_length_std = np.std(key_length_list)
-                qber_std = np.std(qber_list)
-                key_length_diff = np.max(key_length_list) - np.min(key_length_list)
-                qber_diff = np.max(qber_list) - np.min(qber_list)
-                overall_result = {
-                    "initial bit length": initial_bit_length,
-                    "eve_ratio": eve,
-                    "sample_ratio": sample,
-                    "channel_noise": channel,
-                    "detection_noise": detection,
-                    "success percentage": success_percentage,
-                    "final key length average": key_length_ave,
-                    "final key length std": key_length_std,
-                    "final key length diff": key_length_diff,
-                    "qber average": qber_ave,
-                    "qber std": qber_std,
-                    "qber diff": qber_diff,
-                }
-                write_test_result("result_overall.csv", overall_result)
+    success_percentage = (scount / (scount + fcount)) * 100
+    key_length_list = list(map(int, key_length_list))
+    key_length_ave = sum(key_length_list) / len(key_length_list)
+    qber_ave = sum(qber_list) / len(qber_list)
+    key_length_std = np.std(key_length_list)
+    qber_std = np.std(qber_list)
+    key_length_diff = np.max(key_length_list) - np.min(key_length_list)
+    qber_diff = np.max(qber_list) - np.min(qber_list)
+    excution_time_ave = sum(execution_time_list) / len(execution_time_list)
+    excution_time_std = np.std(execution_time_list)
+    excution_time_diff = np.max(execution_time_list) - np.min(execution_time_list)
+    overall_result = {
+        "test type": test_type,
+        "initial bit length": initial_bit_length,
+        "eve_ratio": eve,
+        "sample_ratio": sample,
+        "channel_noise": channel,
+        "detection_noise": detection,
+        "success percentage": success_percentage,
+        "final key length average": key_length_ave,
+        "final key length std": key_length_std,
+        "final key length diff": key_length_diff,
+        "qber average": qber_ave,
+        "qber std": qber_std,
+        "qber diff": qber_diff,
+        "execution time average": excution_time_ave,
+        "execution time std": excution_time_std,
+        "execution time diff": excution_time_diff
+    }
+    write_test_result("result_overall.csv", overall_result)
+
+eve = 0
+sample = 0.15
+channel = 0
+detection = 0
+
+for channel in tqdm(channel_noise_list, desc="Channel noise"):
+    test_type = "Channel noise"
+    scount = 0
+    fcount = 0
+    key_length_list = []
+    qber_list = []
+    execution_time_list = []
+    initial_bit_length = 1000
+    for i in tqdm(range(10)):
+        result, final_key_length, qber, bm_success_count, execution_time = main(initial_bit_length = initial_bit_length, eve_ratio=eve, sample_ratio=sample, channel_noise=channel, detection_noise=detection)
+        key_length_list.append(final_key_length)
+        qber_list.append(qber)
+        execution_time_list.append(execution_time)
+        if result == 100:
+            scount += 1
+            outcome = 'Success'
+        elif result == 0:
+            fcount += 1
+            outcome = 'Not enough security, fail'
+        else:
+            fcount += 1
+            outcome = 'Fail'
+
+        result_dict = {
+            "test type": test_type,
+            "initial bit length": initial_bit_length,
+            "eve_ratio": eve,
+            "sample_ratio": sample,
+            "channel_noise": channel,
+            "detection_noise": detection,
+            "qber": qber,
+            "outcome": outcome,
+            "final key length": final_key_length,
+            "bm_success_count": bm_success_count, 
+            "execution_time": execution_time
+        }
+        write_test_result("result.csv", result_dict)
+
+    success_percentage = (scount / (scount + fcount)) * 100
+    key_length_list = list(map(int, key_length_list))
+    key_length_ave = sum(key_length_list) / len(key_length_list)
+    qber_ave = sum(qber_list) / len(qber_list)
+    key_length_std = np.std(key_length_list)
+    qber_std = np.std(qber_list)
+    key_length_diff = np.max(key_length_list) - np.min(key_length_list)
+    qber_diff = np.max(qber_list) - np.min(qber_list)
+    excution_time_ave = sum(execution_time_list) / len(execution_time_list)
+    excution_time_std = np.std(execution_time_list)
+    excution_time_diff = np.max(execution_time_list) - np.min(execution_time_list)
+    overall_result = {
+        "test type": test_type,
+        "initial bit length": initial_bit_length,
+        "eve_ratio": eve,
+        "sample_ratio": sample,
+        "channel_noise": channel,
+        "detection_noise": detection,
+        "success percentage": success_percentage,
+        "final key length average": key_length_ave,
+        "final key length std": key_length_std,
+        "final key length diff": key_length_diff,
+        "qber average": qber_ave,
+        "qber std": qber_std,
+        "qber diff": qber_diff,
+        "execution time average": excution_time_ave,
+        "execution time std": excution_time_std,
+        "execution time diff": excution_time_diff
+    }
+    write_test_result("result_overall.csv", overall_result)
 
 
+eve = 0
+sample = 0.15
+channel = 0
+detection = 0
+
+
+for detection in tqdm(detection_noise_list, desc="Detection noise"):
+    test_type = "Detection noise"
+    scount = 0
+    fcount = 0
+    key_length_list = []
+    qber_list = []
+    execution_time_list = []
+    initial_bit_length = 1000
+    for i in tqdm(range(10)):
+        result, final_key_length, qber, bm_success_count, execution_time = main(initial_bit_length = initial_bit_length, eve_ratio=eve, sample_ratio=sample, channel_noise=channel, detection_noise=detection)
+        key_length_list.append(final_key_length)
+        qber_list.append(qber)
+        execution_time_list.append(execution_time)
+        if result == 100:
+            scount += 1
+            outcome = 'Success'
+        elif result == 0:
+            fcount += 1
+            outcome = 'Not enough security, fail'
+        else:
+            fcount += 1
+            outcome = 'Fail'
+
+        result_dict = {
+            "test type": test_type,
+            "initial bit length": initial_bit_length,
+            "eve_ratio": eve,
+            "sample_ratio": sample,
+            "channel_noise": channel,
+            "detection_noise": detection,
+            "qber": qber,
+            "outcome": outcome,
+            "final key length": final_key_length,
+            "bm_success_count": bm_success_count, 
+            "execution_time": execution_time
+        }
+        write_test_result("result.csv", result_dict)
+
+    success_percentage = (scount / (scount + fcount)) * 100
+    key_length_list = list(map(int, key_length_list))
+    key_length_ave = sum(key_length_list) / len(key_length_list)
+    qber_ave = sum(qber_list) / len(qber_list)
+    key_length_std = np.std(key_length_list)
+    qber_std = np.std(qber_list)
+    key_length_diff = np.max(key_length_list) - np.min(key_length_list)
+    qber_diff = np.max(qber_list) - np.min(qber_list)
+    excution_time_ave = sum(execution_time_list) / len(execution_time_list)
+    excution_time_std = np.std(execution_time_list)
+    excution_time_diff = np.max(execution_time_list) - np.min(execution_time_list)
+    overall_result = {
+        "test type": test_type,
+        "initial bit length": initial_bit_length,
+        "eve_ratio": eve,
+        "sample_ratio": sample,
+        "channel_noise": channel,
+        "detection_noise": detection,
+        "success percentage": success_percentage,
+        "final key length average": key_length_ave,
+        "final key length std": key_length_std,
+        "final key length diff": key_length_diff,
+        "qber average": qber_ave,
+        "qber std": qber_std,
+        "qber diff": qber_diff,
+        "execution time average": excution_time_ave,
+        "execution time std": excution_time_std,
+        "execution time diff": excution_time_diff
+    }
+    write_test_result("result_overall.csv", overall_result)
